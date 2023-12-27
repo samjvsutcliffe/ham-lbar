@@ -1,3 +1,6 @@
+;(restrict-compiler-policy 'speed 0 0)
+;(restrict-compiler-policy 'debug 3 3)
+;(restrict-compiler-policy 'safety 3 3)
 (restrict-compiler-policy 'speed 3 3)
 (restrict-compiler-policy 'debug 0 0)
 (restrict-compiler-policy 'safety 0 0)
@@ -7,6 +10,11 @@
 (ql:quickload :cl-mpm)
 (ql:quickload :cl-mpm/setup)
 (ql:quickload :cl-mpm/particle)
+(ql:quickload :cl-mpm/mpi)
+
+(ql:quickload "magicl")
+;(asdf:compile-system :cl-mpm :force T)
+(ql:quickload "cl-mpm/examples/lbar")
 (ql:quickload :cl-mpm/mpi)
 ;(ql:quickload "cl-mpm/examples/slump")
 ;(require 'cl-mpm-worker)
