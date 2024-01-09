@@ -1,7 +1,7 @@
-;(restrict-compiler-policy 'speed 3 3)
-;(restrict-compiler-policy 'debug 0 0)
-;(restrict-compiler-policy 'safety 0 0)
-;(setf *block-compile-default* t)
+(restrict-compiler-policy 'speed 3 3)
+(restrict-compiler-policy 'debug 0 0)
+(restrict-compiler-policy 'safety 0 0)
+(setf *block-compile-default* t)
 ;(setf *features* (delete :cl-mpm-pic *features*))
 ;(asdf:compile-system :cl-mpm/examples/tpb :force T)
 
@@ -356,7 +356,7 @@
   ;; (defparameter *sim* (setup-test-column '(1 1 1) '(1 1 1) 1 1))
 
   (let* ((mesh-size (/ 0.025 1.0d0))
-         (mps-per-cell 4)
+         (mps-per-cell 2)
          (shelf-height 0.500d0)
          (shelf-length 0.500d0)
          ;; (shelf-length 0.225d0)
@@ -776,7 +776,8 @@
          (dt (cl-mpm:sim-dt *sim*))
          (substeps (floor target-time dt))
          (dt-scale 1d0)
-         (disp-step 0.008d-3)
+         (load-steps 50)
+         (disp-step (/ 0.8d-3 load-steps))
          )
 
     (setf cl-mpm/penalty::*debug-force* 0d0)
@@ -790,7 +791,8 @@
                     (setf substeps substeps-e))
     (format t "Substeps ~D~%" substeps)
     (setf *target-displacement* 0d0)
-    (time (loop for steps from 0 to 100
+    (setf cl-mpm/damage::*delocal-counter-max* 0)
+    (time (loop for steps from 0 to load-steps
                 while *run-sim*
                 do
                    (progn
@@ -804,14 +806,16 @@
                        (incf *target-displacement* disp-step)
                        (time
                         (progn
-                          (cl-mpm/dynamic-relaxation::converge-quasi-static *sim* :energy-crit 1d-4)
+                          (cl-mpm/dynamic-relaxation::converge-quasi-static *sim* :energy-crit 1d-5)
                           (cl-mpm/damage::calculate-damage *sim*)))
+                       (incf average-disp (get-disp *terminus-mps*))
+                       (incf average-force cl-mpm/penalty::*debug-force*)
                        
                        (push
-                        (get-disp *terminus-mps*)
+                         average-disp
                         *data-displacement*)
                        (push
-                       cl-mpm/penalty::*debug-force*
+                         average-force
                         *data-load*)
 
                        ;; (plot-load-disp)
@@ -838,33 +842,33 @@
                      ))))
   (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" *sim-step*)) *sim*))
 
-(defun plot-load-disp ()
-  (let ((df (lisp-stat:read-csv
-	           (uiop:read-file-string #P"example_data/lbar/load-disp.csv"))))
-    (vgplot:xlabel "Displacement (mm)")
-    (vgplot:ylabel "Load (N)")
-    (let* ((x-model (cl-mpm/mesh:mesh-resolution (cl-mpm:sim-mesh *sim*)))
-           (x-experiment 0.1d0)
-           (x-scale (/ x-experiment x-model)))
-      (vgplot:plot
-       (lisp-stat:column df 'disp) (lisp-stat:column df 'load) "Data"
-       ;; (mapcar (lambda (x) (* x -1d3)) *data-displacement*) *data-node-load* "node"
-       (mapcar (lambda (x) (* x 1d3)) *data-displacement*) (mapcar (lambda (x) (* x x-scale)) *data-load*) "mpm-mps"
-       ;; (mapcar (lambda (x) (* x -1d3)) *data-displacement*) (mapcar (lambda (x) (* x -2d9)) *data-displacement*) "LE"
-       ))
-
-    ;; (vgplot:format-plot t "set xrange [~f:~f]"
-    ;;                     ;(* -1d3 (- 0.0000001d0 (reduce #'max *data-displacement*)))
-    ;;                     0d0
-    ;;                     (+ 1d-4 (* -1d3 (reduce #'min *data-displacement*)))
-    ;;                     )
-    ;; (vgplot:format-plot t "set yrange [~f:~f]"
-    ;;                     (reduce #'min (mapcar #'min *data-load* *data-mp-load*))
-    ;;                     (* 1.01 (reduce #'max (mapcar #'max *data-load* *data-mp-load*)))
-    ;;                     )
-    ;; (vgplot:axis (list nil nil nil nil))
-    )
-  )
+;(defun plot-load-disp ()
+;  (let ((df (lisp-stat:read-csv
+;	           (uiop:read-file-string #P"example_data/lbar/load-disp.csv"))))
+;    (vgplot:xlabel "Displacement (mm)")
+;    (vgplot:ylabel "Load (N)")
+;    (let* ((x-model (cl-mpm/mesh:mesh-resolution (cl-mpm:sim-mesh *sim*)))
+;           (x-experiment 0.1d0)
+;           (x-scale (/ x-experiment x-model)))
+;      (vgplot:plot
+;       (lisp-stat:column df 'disp) (lisp-stat:column df 'load) "Data"
+;       ;; (mapcar (lambda (x) (* x -1d3)) *data-displacement*) *data-node-load* "node"
+;       (mapcar (lambda (x) (* x 1d3)) *data-displacement*) (mapcar (lambda (x) (* x x-scale)) *data-load*) "mpm-mps"
+;       ;; (mapcar (lambda (x) (* x -1d3)) *data-displacement*) (mapcar (lambda (x) (* x -2d9)) *data-displacement*) "LE"
+;       ))
+;
+;    ;; (vgplot:format-plot t "set xrange [~f:~f]"
+;    ;;                     ;(* -1d3 (- 0.0000001d0 (reduce #'max *data-displacement*)))
+;    ;;                     0d0
+;    ;;                     (+ 1d-4 (* -1d3 (reduce #'min *data-displacement*)))
+;    ;;                     )
+;    ;; (vgplot:format-plot t "set yrange [~f:~f]"
+;    ;;                     (reduce #'min (mapcar #'min *data-load* *data-mp-load*))
+;    ;;                     (* 1.01 (reduce #'max (mapcar #'max *data-load* *data-mp-load*)))
+;    ;;                     )
+;    ;; (vgplot:axis (list nil nil nil nil))
+;    )
+;  )
 
 (setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
 (defparameter *run-sim* nil)
