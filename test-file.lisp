@@ -1,4 +1,4 @@
-(load "tpb.lisp")
+(load "lbar.lisp")
 ;; (uiop:quit)
 ;; (in-package :cl-mpm/examples/slump)
 ;; (mpi-main-loop)

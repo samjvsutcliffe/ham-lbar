@@ -2,7 +2,7 @@
 
 # Request resources:
 #SBATCH -c 32     # 1 entire node
-#SBATCH --time=10:00:0  # 6 hours (hours:minutes:seconds)
+#SBATCH --time=20:00:0  # 6 hours (hours:minutes:seconds)
 #SBATCH --mem=32G      # 1 GB RAM
 #SBATCH -p shared
 
