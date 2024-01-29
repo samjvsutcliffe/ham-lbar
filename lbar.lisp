@@ -1,16 +1,16 @@
-(restrict-compiler-policy 'speed 3 3)
-(restrict-compiler-policy 'debug 0 0)
-(restrict-compiler-policy 'safety 0 0)
-(setf *block-compile-default* t)
+;(restrict-compiler-policy 'speed 3 3)
+;(restrict-compiler-policy 'debug 0 0)
+;(restrict-compiler-policy 'safety 0 0)
+;(setf *block-compile-default* t)
 ;(setf *features* (delete :cl-mpm-pic *features*))
 ;(asdf:compile-system :cl-mpm/examples/tpb :force T)
 
-(ql:quickload :cl-mpm)
-(ql:quickload :cl-mpm/setup)
-(ql:quickload :cl-mpm/particle)
-(ql:quickload :cl-mpm/mpi)
-(ql:quickload "magicl")
-(ql:quickload "cl-mpm/examples/lbar")
+;(ql:quickload :cl-mpm)
+;(ql:quickload :cl-mpm/setup)
+;(ql:quickload :cl-mpm/particle)
+;(ql:quickload :cl-mpm/mpi)
+;(ql:quickload "magicl")
+;(ql:quickload "cl-mpm/examples/lbar")
 
 (in-package :cl-mpm/examples/lbar)
 
@@ -361,7 +361,7 @@
   ;;   (defparameter *sim* (setup-test-column '(16 16) '(8 8)  '(0 0) *refine* mps-per-dim)))
   ;; (defparameter *sim* (setup-test-column '(1 1 1) '(1 1 1) 1 1))
 
-  (let* ((mesh-size (/ 0.025 0.5d0 refine))
+  (let* ((mesh-size (/ 0.025 refine))
          (mps-per-cell 2)
          (shelf-height 0.500d0)
          (shelf-length 0.500d0)
@@ -470,8 +470,8 @@
   (defparameter *data-full-load* '(0d0))
 
   (with-open-file (stream (merge-pathnames "output/disp.csv") :direction :output :if-exists :supersede)
-    (format stream "disp,load,reaction~%")
-    (format stream "~f,~f~%" 0d0 0d0 0d0)
+    (format stream "disp,load ~%")
+    (format stream "~f,~f~%" 0d0 0d0)
     )
 
   (let* ((target-time 0.5d0)
@@ -1065,7 +1065,7 @@
 ;    )
 ;  )
 
-(setf lparallel:*kernel* (lparallel:make-kernel 32 :name "custom-kernel"))
+(setf lparallel:*kernel* (lparallel:make-kernel 8 :name "custom-kernel"))
 (defparameter *run-sim* nil)
 ;(setup)
 ;(run-static)
