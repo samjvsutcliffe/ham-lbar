@@ -186,10 +186,11 @@
       (setf (cl-mpm::sim-allow-mp-damage-removal sim) nil)
       (setf (cl-mpm::sim-mp-damage-removal-instant sim) nil)
       (setf (cl-mpm::sim-mass-filter sim) 0d0)
-      (let ((ms 1d6))
+      (let ((ms 1d0))
         (setf (cl-mpm::sim-mass-scale sim) ms)
         (setf (cl-mpm:sim-damping-factor sim)
-              (* 1d-2 density ms)
+              ;(* 1d-2 density ms)
+              1d0
               ;; 1d0
               ))
 
@@ -596,6 +597,7 @@
                        (parse-float:parse-float refine)
                        1d0))
       (format t "Kappa ~F - LC ~F - Refine ~F ~%" kappa lc refine)
+      ;(setup kappa lc refine)
       (setup kappa lc refine)
       (format t "Mesh size:~F~%" (cl-mpm/mesh::mesh-resolution (cl-mpm:sim-mesh *sim*)))
       (format t "Terminus mps:~F~%" (length *terminus-mps*))
@@ -912,6 +914,10 @@
                    (progn
                      (format t "Step ~d ~%" steps)
                      (cl-mpm/output:save-vtk (merge-pathnames (format nil "output/sim_~5,'0d.vtk" *sim-step*)) *sim*)
+                    (defparameter *terminus-mps*
+                      (loop for mp across (cl-mpm:sim-mps *sim*)
+                            when (= (cl-mpm/particle::mp-index mp) 1)
+                            collect mp))
                      (let ((average-force 0d0)
                            (average-disp 0d0)
                            (average-reaction 0d0))
@@ -1006,9 +1012,12 @@
                     (time
                      (progn
                        (cl-mpm/dynamic-relaxation::converge-quasi-static *sim* :energy-crit 1d-5)
-                       (cl-mpm/damage::calculate-damage *sim*)))
+                       ;(cl-mpm/damage::calculate-damage *sim*)
+                       ))
                     (incf average-disp (get-disp *terminus-mps*))
                     (incf average-force cl-mpm/penalty::*debug-force*)
+                    (setf average-disp (cl-mpm/mpi::mpi-average average-disp (length *terminus-mps*)))
+                    (setf average-force (cl-mpm/mpi::mpi-average average-force (length *terminus-mps*)))
                     (push
                      average-disp
                      *data-displacement*)
