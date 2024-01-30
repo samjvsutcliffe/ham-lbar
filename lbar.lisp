@@ -362,7 +362,7 @@
   ;;   (defparameter *sim* (setup-test-column '(16 16) '(8 8)  '(0 0) *refine* mps-per-dim)))
   ;; (defparameter *sim* (setup-test-column '(1 1 1) '(1 1 1) 1 1))
 
-  (let* ((mesh-size (/ 0.025 refine))
+  (let* ((mesh-size (/ 0.025 (* 0.5d0 refine)))
          (mps-per-cell 2)
          (shelf-height 0.500d0)
          (shelf-length 0.500d0)
@@ -832,7 +832,7 @@
                        (incf *target-displacement* disp-step)
                        (time
                         (progn
-                          (cl-mpm/dynamic-relaxation::converge-quasi-static *sim* :energy-crit 1d-5)
+                          (cl-mpm/dynamic-relaxation::converge-quasi-static *sim* :energy-crit 1d-5 :dt-scale 0.5d0)
                           (cl-mpm/damage::calculate-damage *sim*)))
                        (incf average-disp (get-disp *terminus-mps*))
                        (incf average-force cl-mpm/penalty::*debug-force*)
@@ -926,7 +926,7 @@
                        (incf *target-displacement* disp-step)
                        (time
                         (progn
-                          (cl-mpm/dynamic-relaxation::converge-quasi-static *sim* :energy-crit 1d-5)
+                          (cl-mpm/dynamic-relaxation::converge-quasi-static *sim* :energy-crit 8d-1)
                           (cl-mpm/damage::calculate-damage *sim*)))
                        (incf average-disp (get-disp *terminus-mps*))
                        (incf average-force cl-mpm/penalty::*debug-force*)
@@ -978,7 +978,8 @@
          (dt (cl-mpm:sim-dt *sim*))
          (substeps (floor target-time dt))
          (dt-scale 1d0)
-         (disp-step -0.002d-3)
+         (load-steps 50)
+         (disp-step (/ 0.8d-3 load-steps))
          (rank (cl-mpi:mpi-comm-rank))
          )
 
@@ -1003,6 +1004,7 @@
                 (progn
                   (when (= rank 0)
                     (format t "Step ~d ~%" steps))
+                  (cl-mpm/output:save-vtk (merge-pathnames output-folder (format nil "sim_~2,'0d_~5,'0d.vtk" rank *sim-step*)) *sim*)
                   (let ((average-force 0d0)
                         (average-disp 0d0)
                         (average-reaction 0d0))
@@ -1011,8 +1013,11 @@
                     (incf *target-displacement* disp-step)
                     (time
                      (progn
-                       (cl-mpm/dynamic-relaxation::converge-quasi-static *sim* :energy-crit 1d-5)
-                       ;(cl-mpm/damage::calculate-damage *sim*)
+                       (cl-mpm/dynamic-relaxation::converge-quasi-static
+                        *sim*
+                        :energy-crit 6d-1
+                        :dt-scale 0.5d0)
+                       (cl-mpm/damage::calculate-damage *sim*)
                        ))
                     (incf average-disp (get-disp *terminus-mps*))
                     (incf average-force cl-mpm/penalty::*debug-force*)
