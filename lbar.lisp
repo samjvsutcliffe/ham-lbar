@@ -147,8 +147,8 @@
          )
     (declare (double-float h density))
     (progn
-      (let* ((impactor-size (list 10d-3
-                                  (* 0.99 h-x))))
+      (let* ((scaler 1d0)
+             )
         (setf (cl-mpm:sim-mps sim)
               (cl-mpm/setup::make-mps-from-list
                (append
@@ -168,9 +168,9 @@
                  :fracture-energy 95d0
                  :initiation-stress (* 2.7d6 1d0)
                  :critical-damage 1.000d0
-                 :internal-length (* 25d-3 1d0 lc-scale)
-                 :local-length (* 25d-3 (sqrt 7) lc-scale kappa-scale)
-                 :local-length-damaged (* 25d-3 (sqrt 7) lc-scale kappa-scale)
+                 :internal-length (* 25d-3 1d0 lc-scale scaler)
+                 :local-length (* 25d-3 (sqrt 7) lc-scale kappa-scale scaler)
+                 :local-length-damaged (* 25d-3 (sqrt 7) lc-scale kappa-scale scaler)
                  :ductility 6.8d0
                  :compression-ratio 10d0
                  ;; :local-length-damaged 0.01d0
@@ -181,7 +181,7 @@
                 )
                )))
       (setf (cl-mpm:sim-allow-mp-split sim) nil)
-      (setf (cl-mpm::sim-enable-damage sim) t)
+      (setf (cl-mpm::sim-enable-damage sim) nil)
       (setf (cl-mpm::sim-nonlocal-damage sim) t)
       (setf (cl-mpm::sim-allow-mp-damage-removal sim) nil)
       (setf (cl-mpm::sim-mp-damage-removal-instant sim) nil)
@@ -320,6 +320,9 @@
                       sim
                     (let ((datum (* 1d0 (+ *initial-surface* *target-displacement*)))
                           (normal (cl-mpm/utils:vector-from-list  '(0d0 1d0 0d0))))
+                      (loop for mp across (cl-mpm:sim-mps *sim*)
+                                                  when (= (cl-mpm/particle::mp-index mp) 1)
+                                                  collect mp)
                       (cl-mpm/penalty::apply-displacement-control-mps mesh (coerce *terminus-mps* 'vector)
                                                        dt
                                                        normal
@@ -362,7 +365,7 @@
   ;;   (defparameter *sim* (setup-test-column '(16 16) '(8 8)  '(0 0) *refine* mps-per-dim)))
   ;; (defparameter *sim* (setup-test-column '(1 1 1) '(1 1 1) 1 1))
 
-  (let* ((mesh-size (/ 0.025 (* 0.5d0 refine)))
+  (let* ((mesh-size (/ 0.025 refine))
          (mps-per-cell 2)
          (shelf-height 0.500d0)
          (shelf-length 0.500d0)
@@ -926,7 +929,7 @@
                        (incf *target-displacement* disp-step)
                        (time
                         (progn
-                          (cl-mpm/dynamic-relaxation::converge-quasi-static *sim* :energy-crit 8d-1)
+                          (cl-mpm/dynamic-relaxation::converge-quasi-static *sim* :energy-crit 1d-1)
                           (cl-mpm/damage::calculate-damage *sim*)))
                        (incf average-disp (get-disp *terminus-mps*))
                        (incf average-force cl-mpm/penalty::*debug-force*)
@@ -998,7 +1001,7 @@
     (when (= rank 0)
       (format t "Substeps ~D~%" substeps))
     (incf *target-displacement* disp-step)
-    (time (loop for steps from 0 to 100
+    (time (loop for steps from 0 to load-steps
                 while *run-sim*
                 do
                 (progn
@@ -1015,9 +1018,22 @@
                      (progn
                        (cl-mpm/dynamic-relaxation::converge-quasi-static
                         *sim*
-                        :energy-crit 6d-1
-                        :dt-scale 0.5d0)
-                       (cl-mpm/damage::calculate-damage *sim*)
+                        :energy-crit 1d-2
+                        :dt-scale 0.5d0
+                        :post-iter-step (lambda ()
+                                          (setf *terminus-mps*
+                                            (loop for mp across (cl-mpm:sim-mps *sim*)
+                                                  when (= (cl-mpm/particle::mp-index mp) 1)
+                                                  collect mp))
+                                          (let ((av (cl-mpm/mpi::mpi-average (get-disp *terminus-mps*) (length *terminus-mps*))))
+                                            (when (= rank 0)
+                                                (format t "Conv disp - Target: ~E - Current: ~E"
+                                                                              *target-displacement*
+                                                                              av)
+                                              )))
+                        
+                        )
+                       ;(cl-mpm/damage::calculate-damage *sim*)
                        ))
                     (incf average-disp (get-disp *terminus-mps*))
                     (incf average-force cl-mpm/penalty::*debug-force*)
@@ -1042,7 +1058,10 @@
                     (when (= rank 0)
                       (format t "Target: ~E - Current: ~E"
                               *target-displacement*
-                              average-disp)))
+                              average-disp)
+                      (format t "Load - ~E~%" average-force)
+                      
+                      ))
                   ;; (multiple-value-bind (dt-e substeps-e) (cl-mpm:calculate-adaptive-time *sim* target-time :dt-scale dt-scale)
                   ;;   (setf substeps substeps-e))
                   (incf *sim-step*)
