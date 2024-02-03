@@ -190,8 +190,9 @@
         (setf (cl-mpm::sim-mass-scale sim) ms)
         (setf (cl-mpm:sim-damping-factor sim)
               ;(* 1d-2 density ms)
-              1d0
               ;; 1d0
+              (* 7d0 density)
+
               ))
 
       (dotimes (i 0)
@@ -1018,21 +1019,21 @@
                      (progn
                        (cl-mpm/dynamic-relaxation::converge-quasi-static
                         *sim*
+                        :conv-steps 5
                         :energy-crit 1d-2
-                        :dt-scale 0.5d0
-                        :post-iter-step (lambda ()
-                                          (setf *terminus-mps*
-                                            (loop for mp across (cl-mpm:sim-mps *sim*)
-                                                  when (= (cl-mpm/particle::mp-index mp) 1)
-                                                  collect mp))
-                                          (let ((av (cl-mpm/mpi::mpi-average (get-disp *terminus-mps*) (length *terminus-mps*))))
-                                            (when (= rank 0)
-                                                (format t "Conv disp - Target: ~E - Current: ~E"
-                                                                              *target-displacement*
-                                                                              av)
-                                              )))
-                        
-                        )
+                        :dt-scale 1d0
+                        :post-iter-step
+                        (lambda ()
+                          (setf *terminus-mps*
+                                (loop for mp across (cl-mpm:sim-mps *sim*)
+                                      when (= (cl-mpm/particle::mp-index mp) 1)
+                                        collect mp))
+                          (let ((av (cl-mpm/mpi::mpi-average (get-disp *terminus-mps*) (length *terminus-mps*))))
+                            (when (= rank 0)
+                              (format t "Conv disp - Target: ~E - Current: ~E"
+                                      *target-displacement*
+                                      av)
+                              ))))
                        ;(cl-mpm/damage::calculate-damage *sim*)
                        ))
                     (incf average-disp (get-disp *terminus-mps*))
