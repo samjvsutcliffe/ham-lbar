@@ -1,16 +1,16 @@
-;(restrict-compiler-policy 'speed 3 3)
-;(restrict-compiler-policy 'debug 0 0)
-;(restrict-compiler-policy 'safety 0 0)
-;(setf *block-compile-default* t)
-;(setf *features* (delete :cl-mpm-pic *features*))
-;(asdf:compile-system :cl-mpm/examples/tpb :force T)
+;; (restrict-compiler-policy 'speed 3 3)
+;; (restrict-compiler-policy 'debug 0 0)
+;; (restrict-compiler-policy 'safety 0 0)
+;; (setf *block-compile-default* t)
+;; ;(setf *features* (delete :cl-mpm-pic *features*))
+;; ;(asdf:compile-system :cl-mpm/examples/tpb :force T)
 
-;(ql:quickload :cl-mpm)
-;(ql:quickload :cl-mpm/setup)
-;(ql:quickload :cl-mpm/particle)
-;(ql:quickload :cl-mpm/mpi)
-;(ql:quickload "magicl")
-;(ql:quickload "cl-mpm/examples/lbar")
+;; (ql:quickload :cl-mpm)
+;; (ql:quickload :cl-mpm/setup)
+;; (ql:quickload :cl-mpm/particle)
+;; (ql:quickload :cl-mpm/mpi)
+;; (ql:quickload "magicl")
+;; (ql:quickload "cl-mpm/examples/lbar")
 
 (in-package :cl-mpm/examples/lbar)
 
@@ -321,9 +321,10 @@
                       sim
                     (let ((datum (* 1d0 (+ *initial-surface* *target-displacement*)))
                           (normal (cl-mpm/utils:vector-from-list  '(0d0 1d0 0d0))))
-                      (loop for mp across (cl-mpm:sim-mps *sim*)
-                                                  when (= (cl-mpm/particle::mp-index mp) 1)
-                                                  collect mp)
+                      (setf *terminus-mps*
+                            (loop for mp across (cl-mpm:sim-mps *sim*)
+                                  when (= (cl-mpm/particle::mp-index mp) 1)
+                                    collect mp))
                       (cl-mpm/penalty::apply-displacement-control-mps mesh (coerce *terminus-mps* 'vector)
                                                        dt
                                                        normal
@@ -366,7 +367,7 @@
   ;;   (defparameter *sim* (setup-test-column '(16 16) '(8 8)  '(0 0) *refine* mps-per-dim)))
   ;; (defparameter *sim* (setup-test-column '(1 1 1) '(1 1 1) 1 1))
 
-  (let* ((mesh-size (/ 0.025 refine))
+  (let* ((mesh-size (/ 0.025 (* 0.5d0 refine)))
          (mps-per-cell 2)
          (shelf-height 0.500d0)
          (shelf-length 0.500d0)
@@ -836,7 +837,11 @@
                        (incf *target-displacement* disp-step)
                        (time
                         (progn
-                          (cl-mpm/dynamic-relaxation::converge-quasi-static *sim* :energy-crit 1d-5 :dt-scale 0.5d0)
+                          (cl-mpm/dynamic-relaxation::converge-quasi-static *sim* 
+                        :conv-steps 5
+                        :energy-crit 5d-2
+                        :dt-scale 1d0
+                        )
                           (cl-mpm/damage::calculate-damage *sim*)))
                        (incf average-disp (get-disp *terminus-mps*))
                        (incf average-force cl-mpm/penalty::*debug-force*)
@@ -1020,7 +1025,7 @@
                        (cl-mpm/dynamic-relaxation::converge-quasi-static
                         *sim*
                         :conv-steps 5
-                        :energy-crit 1d-2
+                        :energy-crit 1d-1
                         :dt-scale 1d0
                         :post-iter-step
                         (lambda ()
@@ -1034,12 +1039,14 @@
                                       *target-displacement*
                                       av)
                               ))))
-                       ;(cl-mpm/damage::calculate-damage *sim*)
+                       (cl-mpm/damage::calculate-damage *sim*)
                        ))
                     (incf average-disp (get-disp *terminus-mps*))
                     (incf average-force cl-mpm/penalty::*debug-force*)
-                    (setf average-disp (cl-mpm/mpi::mpi-average average-disp (length *terminus-mps*)))
-                    (setf average-force (cl-mpm/mpi::mpi-average average-force (length *terminus-mps*)))
+                    (setf average-disp (cl-mpm/mpi::mpi-sum average-disp))
+                    (setf average-force (cl-mpm/mpi::mpi-sum average-force))
+                    ;; (setf average-disp (cl-mpm/mpi::mpi-average average-disp (length *terminus-mps*)))
+                    ;; (setf average-force (cl-mpm/mpi::mpi-average average-force (length *terminus-mps*)))
                     (push
                      average-disp
                      *data-displacement*)
@@ -1057,7 +1064,7 @@
 
 
                     (when (= rank 0)
-                      (format t "Target: ~E - Current: ~E"
+                      (format t "Target: ~E - Current: ~E ~%"
                               *target-displacement*
                               average-disp)
                       (format t "Load - ~E~%" average-force)
@@ -1101,8 +1108,8 @@
 
 (setf lparallel:*kernel* (lparallel:make-kernel 8 :name "custom-kernel"))
 (defparameter *run-sim* nil)
-;(setup)
-;(run-static)
+;; (setup)
+;; (run-static)
 ;(run)
 (mpi-loop)
 
