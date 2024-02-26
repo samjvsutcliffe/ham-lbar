@@ -185,7 +185,7 @@
       (setf (cl-mpm::sim-nonlocal-damage sim) t)
       (setf (cl-mpm::sim-allow-mp-damage-removal sim) nil)
       (setf (cl-mpm::sim-mp-damage-removal-instant sim) nil)
-      (setf (cl-mpm::sim-mass-filter sim) 0d0)
+      (setf (cl-mpm::sim-mass-filter sim) 1d-10)
       (let ((ms 1d0))
         (setf (cl-mpm::sim-mass-scale sim) ms)
         (setf (cl-mpm:sim-damping-factor sim)
@@ -212,7 +212,7 @@
                dir
                )))))
 
-      (let ((dt-scale 1d0))
+      (let ((dt-scale 0.5d0))
         (setf
          (cl-mpm:sim-dt sim)
          (* dt-scale h
@@ -356,10 +356,6 @@
 (defparameter *t* 0)
 (defparameter *sim-step* 0)
 (defparameter *refine* (/ 1d0 2d0))
-(let ((refine (uiop:getenv "REFINE")))
-  (when refine
-    (setf *refine* (parse-integer (uiop:getenv "REFINE")))
-    ))
 (defun setup (&optional (kappa-scale 1d0)
                 (lc-scale 1d0)
                 (refine 1d0))
@@ -367,7 +363,7 @@
   ;;   (defparameter *sim* (setup-test-column '(16 16) '(8 8)  '(0 0) *refine* mps-per-dim)))
   ;; (defparameter *sim* (setup-test-column '(1 1 1) '(1 1 1) 1 1))
 
-  (let* ((mesh-size (/ 0.025 (* 0.5d0 refine)))
+  (let* ((mesh-size (/ 0.025 refine))
          (mps-per-cell 2)
          (shelf-height 0.500d0)
          (shelf-length 0.500d0)
@@ -377,10 +373,7 @@
          (offset (list
                   (* 4 mesh-size)
                   0d0
-                  0d0))
-
-
-         )
+                  0d0)))
     (defparameter *sim*
       (setup-test-column (list domain-length
                                domain-height
@@ -601,6 +594,7 @@
       (setf refine (if refine
                        (parse-float:parse-float refine)
                        1d0))
+      (setf *refine* refine)
       (format t "Kappa ~F - LC ~F - Refine ~F ~%" kappa lc refine)
       ;(setup kappa lc refine)
       (setup kappa lc refine)
@@ -837,10 +831,12 @@
                        (time
                         (progn
                           (cl-mpm/dynamic-relaxation::converge-quasi-static *sim* 
-                        :conv-steps 5
-                        :energy-crit 5d-2
-                        :dt-scale 1d0
+                        :conv-steps 10
+                        :energy-crit 1d-1
+                        :dt-scale 1.0d0
                         )
+                          (setf cl-mpm/penalty::*debug-force* 0)
+                          (cl-mpm::update-sim *sim*)
                           (cl-mpm/damage::calculate-damage *sim*)))
                        (incf average-disp (get-disp *terminus-mps*))
                        (incf average-force cl-mpm/penalty::*debug-force*)
@@ -1023,29 +1019,29 @@
                      (progn
                        (cl-mpm/dynamic-relaxation::converge-quasi-static
                         *sim*
-                        :conv-steps 5
-                        :energy-crit 1d-1
-                        :dt-scale 1d0
+                        :conv-steps 50
+                        :energy-crit 1d-2
+                        :dt-scale 1.0d0 
+                        :substeps 50;(* 50 *refine*)
                         :post-iter-step
                         (lambda ()
                           (setf *terminus-mps*
                                 (loop for mp across (cl-mpm:sim-mps *sim*)
                                       when (= (cl-mpm/particle::mp-index mp) 1)
                                         collect mp))
-                          (let ((av (cl-mpm/mpi::mpi-average (get-disp *terminus-mps*) (length *terminus-mps*))))
+                          (let ((av (* 2 (cl-mpm/mpi::mpi-average (get-disp *terminus-mps*) (length *terminus-mps*)))))
                             (when (= rank 0)
-                              (format t "Conv disp - Target: ~E - Current: ~E"
+                              (format t "Conv disp - Target: ~E - Current: ~E - Error: ~E~%"
                                       *target-displacement*
-                                      av)
-                              ))))
-                       (cl-mpm/damage::calculate-damage *sim*)
-                       ))
+                                      av
+                                      (abs (- *target-displacement* av ))))))
+                        
+                        )
+                       (cl-mpm/damage::calculate-damage *sim*)))
                     (incf average-disp (get-disp *terminus-mps*))
                     (incf average-force cl-mpm/penalty::*debug-force*)
                     (setf average-disp (cl-mpm/mpi::mpi-sum average-disp))
                     (setf average-force (cl-mpm/mpi::mpi-sum average-force))
-                    ;; (setf average-disp (cl-mpm/mpi::mpi-average average-disp (length *terminus-mps*)))
-                    ;; (setf average-force (cl-mpm/mpi::mpi-average average-force (length *terminus-mps*)))
                     (push
                      average-disp
                      *data-displacement*)
@@ -1054,12 +1050,13 @@
                      *data-load*)
 
                     (when (= rank 0)
-                      (with-open-file (stream (merge-pathnames output-folder "disp.csv") :direction :output :if-exists :append)
-                        (format stream "~f,~f,~f~%"
-                                average-disp
-                                average-force
-                                average-reaction
-                                )))
+                      (let ((mesh-size (cl-mpm/mesh::mesh-resolution (cl-mpm:sim-mesh *sim*))))
+                        (with-open-file (stream (merge-pathnames output-folder "disp.csv") :direction :output :if-exists :append)
+                          (format stream "~f,~f,~f~%"
+                                  average-disp
+                                  (/ average-force mesh-size)
+                                  (/ average-reaction mesh-size)
+                                  ))))
 
 
                     (when (= rank 0)
