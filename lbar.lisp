@@ -147,7 +147,7 @@
          )
     (declare (double-float h density))
     (progn
-      (let* ((scaler 1d0)
+      (let* ((scaler (sqrt 7))
              )
         (setf (cl-mpm:sim-mps sim)
               (cl-mpm/setup::make-mps-from-list
@@ -161,16 +161,17 @@
                              (list mp-scale mp-scale 2)
                              )
                  density
-                 'cl-mpm/particle::particle-limestone
-                 :E 25.85d9
+                 'cl-mpm/particle::particle-limestone-delayed
+                 ;; :E 25.85d9
+                 :E 21.00d9
                  :nu 0.18d0
                  ;; :elastic-approxmation :plane-stress
                  :fracture-energy 95d0
                  :initiation-stress (* 2.7d6 1d0)
                  :critical-damage 1.000d0
-                 :internal-length (* 25d-3 1d0 lc-scale scaler)
-                 :local-length (* 25d-3 (sqrt 7) lc-scale kappa-scale scaler)
-                 :local-length-damaged (* 25d-3 (sqrt 7) lc-scale kappa-scale scaler)
+                 ;; :internal-length (* 25d-3 1d0 lc-scale scaler)
+                 :local-length (* 25d-3 lc-scale kappa-scale scaler)
+                 :local-length-damaged (* 25d-3 lc-scale kappa-scale scaler)
                  :ductility 6.8d0
                  :compression-ratio 10d0
                  ;; :local-length-damaged 0.01d0
@@ -665,10 +666,13 @@
 
   (let ((ms 1d4))
     (setf (cl-mpm::sim-mass-scale *sim*) ms)
-    (setf (cl-mpm::sim-damping-factor *sim*) (* ms 1d0)))
+    (setf (cl-mpm::sim-damping-factor *sim*) (* ms 5d0)))
 
   (setf (cl-mpm:sim-dt *sim*)
         (cl-mpm/setup:estimate-elastic-dt *sim* :dt-scale 0.8d0))
+
+  (setf (cl-mpm::sim-enable-damage *sim*) t)
+  (setf (cl-mpm/damage::sim-damage-delocal-counter-max *sim*) 20)
 
 
   (let* ((target-time 0.1d0)
@@ -736,13 +740,8 @@
                         (incf *target-displacement* (/ disp-step substeps))
                         (setf *t* (+ *t* (cl-mpm::sim-dt *sim*))))
                       )
-                    ;; (incf *target-displacement* -0.01d-3)
-                    ;; (format t "Rank ~D - tmps ~a ~%" rank (length *terminus-mps*))
-                    ;; (format t "Average ~D - disp ~a ~%" rank average-disp)
-                    ;; (format t "Average ~D - force ~a ~%" rank average-force)
                     (setf average-disp (mpi-average average-disp (length *terminus-mps*)))
                     (setf average-force (mpi-average average-force (length *terminus-mps*)))
-                    ;(setf average-reaction (mpi-sum average-force (length *terminus-mps*)))
                     (push
                       average-disp
                       *data-displacement*)
@@ -976,6 +975,9 @@
   (defparameter *target-displacement* 0d0)
   (defparameter *data-full-time* '(0d0))
   (defparameter *data-full-load* '(0d0))
+
+  (loop for mp across (cl-mpm:sim-mps *sim*)
+        do (change-class mp 'cl-mpm/particle::particle-limestone))
 
 
   (let* ((target-time 0.5d0)
