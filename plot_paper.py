@@ -37,7 +37,7 @@ regex = re.compile(r'output-.*')
 folders = list(filter(regex.search,os.listdir("./")))
 
 plt.figure()
-plt.plot(data["disp"],data["load"],label="Data")
+plt.plot(data["disp"],data["load"],label="FEM")
 lower = pd.read_csv("lower.csv")
 upper = pd.read_csv("upper.csv")
 x_min = min(lower["x"].min(),upper["x"].min())
@@ -47,20 +47,22 @@ x_samples = np.linspace(x_min,x_max,100)
 lower_y = np.interp(x_samples,lower["x"],1e3*lower["y"])
 upper_y = np.interp(x_samples,upper["x"],1e3*upper["y"])
 
-plt.fill_between(x_samples,lower_y,upper_y, facecolor='grey', alpha=0.5)
+plt.fill_between(x_samples,lower_y,upper_y, facecolor='grey', alpha=0.5,label="Experimental")
 
 folders = ["./output-0.5-0.0-1.0/",
-           "./output-1.0-0.0-1.0/",
-           "./output-2.0-0.0-1.0/"]
+           "./output-2.0-0.0-1.0/",
+           "./output-4.0-0.0-1.0/"]
 
-for i in folders:
+names = ["Coarse","Medium","Fine"]
+for i,name in zip(folders,names):
     print("loading folder: ",i)
     mpm = pd.read_csv("./{}/disp.csv".format(i))
     print("GF mpm:",calculate_gf(1e3*mpm["disp"],100e-3*mpm["load"]))
-    plt.plot(1e3*mpm["disp"],100e-3*mpm["load"],label=i)
+    plt.plot(1e3*mpm["disp"],100e-3*mpm["load"],label=name)
     plt.xlabel("Displacement (mm)")
     plt.ylabel("Load (N)")
 plt.tight_layout()
-plt.legend(["FEM","Experimental","Coarse","Medium","Fine"])
+plt.legend()
+#plt.legend(["FEM","Experimental","Coarse","Medium","Fine"])
 plt.savefig("paper.pdf")
 plt.show()
