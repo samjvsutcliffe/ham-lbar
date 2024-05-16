@@ -222,7 +222,8 @@
               ;; 1d0
               ;0.05d0
               ;(* 8d0 density)
-              (* 4.0d0 density)
+              ;; (* 4.0d0 density)
+              (* 4d-3 (cl-mpm/setup::estimate-critical-damping sim))
 
               ))
 
@@ -1071,6 +1072,7 @@
                         *sim*
                         ;:conv-steps 50
                         :energy-crit 1d-3
+                        :oobf-crit 1d-3
                         :dt-scale dt-scale
                         :substeps 50;(floor (* 50 *refine*))
                         :conv-steps 200
