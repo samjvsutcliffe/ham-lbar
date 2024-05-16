@@ -234,7 +234,8 @@
               ;0.05d0
               ;(* 8d0 density)
               ;; (* 4.0d0 density)
-              (* 4d-3 (cl-mpm/setup::estimate-critical-damping sim))
+              ;; (* 4d-3 (cl-mpm/setup::estimate-critical-damping sim))
+              0.7d0
 
               ))
 
@@ -1042,8 +1043,8 @@
   (let* ((target-time 0.2d0)
          (dt (cl-mpm:sim-dt *sim*))
          (substeps (floor target-time dt))
-         (dt-scale 0.5d0)
-         (load-steps 50)
+         (dt-scale 0.9d0)
+         (load-steps 100)
          (disp-step (/ 0.8d-3 load-steps))
          (rank (cl-mpi:mpi-comm-rank)))
 
@@ -1062,7 +1063,7 @@
     (when (= rank 0)
       (format t "Substeps ~D~%" substeps))
     (incf *target-displacement* disp-step)
-    (rank-0-time 
+    (rank-0-time
       rank
       (loop for steps from 0 to load-steps
                 while *run-sim*
