@@ -14,6 +14,17 @@
 
 (in-package :cl-mpm/examples/lbar)
 
+(defmethod cl-mpm::update-node-forces ((sim cl-mpm::mpm-sim))
+  (with-accessors ((damping cl-mpm::sim-damping-factor)
+                   (mass-scale cl-mpm::sim-mass-scale)
+                   (mesh cl-mpm::sim-mesh)
+                   (dt cl-mpm::sim-dt))
+      sim
+    (cl-mpm::iterate-over-nodes
+     mesh
+     (lambda (node)
+       (cl-mpm::calculate-forces-cundall node damping dt mass-scale)))))
+
 (defmacro rank-0-time (rank &rest body)
   `(if (= ,rank 0)
       (time
@@ -1071,8 +1082,8 @@
                        (cl-mpm/dynamic-relaxation::converge-quasi-static
                         *sim*
                         ;:conv-steps 50
-                        :energy-crit 1d-3
-                        :oobf-crit 1d-3
+                        :energy-crit 1d-4
+                        :oobf-crit 1d-4
                         :dt-scale dt-scale
                         :substeps 50;(floor (* 50 *refine*))
                         :conv-steps 200
