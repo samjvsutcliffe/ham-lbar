@@ -34,7 +34,7 @@ for i in folders:
     print("loading folder: ",i)
     mpm = pd.read_csv("./{}/disp.csv".format(i))
     print("GF mpm:",calculate_gf(1e3*mpm["disp"],100e-3*mpm["load"]))
-    plt.plot(1e3*mpm["disp"],100e-3*mpm["load"],label=i)
+    plt.plot(1e3*mpm["disp"],100e-3*mpm["load"],label=i,marker=".")
     plt.xlabel("Displacement (mm)")
     plt.ylabel("Load (N)")
     plt.legend()
