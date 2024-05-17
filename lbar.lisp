@@ -214,8 +214,8 @@
                  :c 3000d3
                                   
                  ;; :local-length-damaged 0.01d0
-                 :gravity -0.0d0
-                 :gravity-axis (cl-mpm/utils:vector-from-list '(0d0 1d0 0d0))
+                 :gravity 0.0d0
+                 :gravity-axis (cl-mpm/utils:vector-from-list '(0d0 0d0 0d0))
                  )
                 ;; impactors
                 )
@@ -226,7 +226,7 @@
       (setf (cl-mpm::sim-nonlocal-damage sim) t)
       (setf (cl-mpm::sim-allow-mp-damage-removal sim) nil)
       (setf (cl-mpm::sim-mp-damage-removal-instant sim) nil)
-      (setf (cl-mpm::sim-mass-filter sim) 1d-10)
+      (setf (cl-mpm::sim-mass-filter sim) 1d-5)
       (let ((ms 1d0))
         (setf (cl-mpm::sim-mass-scale sim) ms)
         (setf (cl-mpm:sim-damping-factor sim)
@@ -742,7 +742,7 @@
          (dt-scale 0.8d0)
          (substeps (floor target-time dt))
          (rank (cl-mpi:mpi-comm-rank))
-         (load-steps 100)
+         (load-steps 50)
          (disp-total 0.8d-3)
          (disp-step (/ disp-total load-steps))
          )
@@ -1051,8 +1051,8 @@
   (let* ((target-time 0.2d0)
          (dt (cl-mpm:sim-dt *sim*))
          (substeps (floor target-time dt))
-         (dt-scale 0.5d0)
-         (load-steps 100)
+         (dt-scale 0.4d0)
+         (load-steps 50)
          (disp-step (/ 0.8d-3 load-steps))
          (rank (cl-mpi:mpi-comm-rank)))
 
@@ -1070,7 +1070,7 @@
     (cl-mpm/output:save-vtk (merge-pathnames output-folder (format nil "sim_final_~2,'0d.vtk" rank)) *sim*)
     (when (= rank 0)
       (format t "Substeps ~D~%" substeps))
-    (incf *target-displacement* disp-step)
+    ;(incf *target-displacement* disp-step)
 
 
     (rank-0-time
@@ -1092,19 +1092,18 @@
                      (progn
                        (cl-mpm/dynamic-relaxation::converge-quasi-static
                         *sim*
-                        ;:conv-steps 50
                         :energy-crit 1d-4
                         :oobf-crit 1d-4
                         :dt-scale dt-scale
-                        :substeps 10
-                        :conv-steps (floor (* 100 *refine*))
+                        :substeps 50
+                        :conv-steps (floor (* 800 *refine*))
                         :post-iter-step
                         (lambda (i fnorm oobf)
                           (setf *terminus-mps*
                                 (loop for mp across (cl-mpm:sim-mps *sim*)
                                       when (= (cl-mpm/particle::mp-index mp) 1)
                                         collect mp))
-                          (cl-mpm/output:save-vtk (merge-pathnames output-folder (format nil "sim_final_~2,'0d.vtk" rank)) *sim*)
+                          ;(cl-mpm/output:save-vtk (merge-pathnames output-folder (format nil "sim_final_~2,'0d.vtk" rank)) *sim*)
                           ;; (let ((av (* 2 (cl-mpm/mpi::mpi-average (get-disp *terminus-mps*)
                           ;;                                         (length *terminus-mps*)))))
                           ;;   (when (= rank 0)
