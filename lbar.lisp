@@ -622,6 +622,7 @@
     (setf refine (if refine
                      (parse-float:parse-float refine)
                      1d0))
+    (setf *refine* refine)
     (format t "Kappa ~F - LC ~F - Refine ~F ~%" kappa lc refine)
     (setup kappa lc refine)
     (run-static (format nil "output-~f-~f-~f/" refine lc kappa))))
@@ -703,8 +704,8 @@
           (time (cl-mpm::update-sim *sim*))
           (cl-mpm::update-sim *sim*))
 
-      ;(run-mpi (format nil "output-~f-~f-~f/" refine lc kappa))
-      (run-mpi-static (format nil "output-~f-~f-~f/" refine lc kappa))
+      (run-mpi (format nil "output-~f-~f-~f/" refine lc kappa))
+      ;; (run-mpi-static (format nil "output-~f-~f-~f/" refine lc kappa))
       (when (= rank 0)
         (format t "Done mpi~%")))
     )
@@ -743,20 +744,26 @@
   (defparameter *target-displacement* 0d0)
   (defparameter *data-full-time* '(0d0))
   (defparameter *data-full-load* '(0d0))
+
   (defparameter *terminus-mps*
     (loop for mp across (cl-mpm:sim-mps *sim*)
           when (= (cl-mpm/particle::mp-index mp) 1)
             collect mp))
 
-  (let ((ms 1d4))
-    (setf (cl-mpm::sim-mass-scale *sim*) ms)
-    (setf (cl-mpm::sim-damping-factor *sim*) (* ms 10d0)))
+  (let ((mass-scale 1d4)
+        (h (cl-mpm/mesh:mesh-resolution (cl-mpm:sim-mesh *sim*))))
+    (setf (cl-mpm::sim-mass-scale *sim*) mass-scale)
+    (setf (cl-mpm:sim-damping-factor *sim*)
+          (* 1d2
+             (expt h 2))))
+
 
   (setf (cl-mpm:sim-dt *sim*)
         (cl-mpm/setup:estimate-elastic-dt *sim* :dt-scale 0.8d0))
 
-  (setf (cl-mpm::sim-enable-damage *sim*) nil)
-  (setf (cl-mpm/damage::sim-damage-delocal-counter-max *sim*) 20)
+  (setf (cl-mpm::sim-enable-damage *sim*) t)
+  ;; (setf (cl-mpm/damage::sim-damage-delocal-counter-max *sim*) 40)
+  (setf (cl-mpm/damage::sim-damage-delocal-counter-max *sim*) (round (* 40 *refine*)))
 
 
   (let* ((target-time 0.1d0)
@@ -764,10 +771,9 @@
          (dt-scale 0.8d0)
          (substeps (floor target-time dt))
          (rank (cl-mpi:mpi-comm-rank))
-         (load-steps 50)
+         (load-steps 100)
          (disp-total 0.8d-3)
-         (disp-step (/ disp-total load-steps))
-         )
+         (disp-step (/ disp-total load-steps)))
 
     (when (= rank 0)
       (format t "Outputting mesh and load-disp graph")
@@ -794,6 +800,7 @@
     ;  (setf substeps substeps-e))
     (when (= rank 0)
       (format t "Substeps ~D~%" substeps))
+    (setf cl-mpm/penalty::*debug-force* 0d0)
     (time (loop for steps from 0 to 100
                 while *run-sim*
                 do
@@ -806,9 +813,7 @@
                         (average-disp 0d0)
                         (average-reaction 0d0))
                     (time
-                      (dotimes (i 5
-                                  ;substeps
-                                  )
+                      (dotimes (i substeps)
                         (defparameter *terminus-mps*
                           (loop for mp across (cl-mpm:sim-mps *sim*)
                                 when (= (cl-mpm/particle::mp-index mp) 1)
@@ -824,7 +829,6 @@
                               (/ (get-disp *terminus-mps*) substeps)
                               )
                         (setf cl-mpm/penalty::*debug-force* 0d0)
-
                         (cl-mpm::update-sim *sim*)
                         (incf *target-displacement* (/ disp-step substeps))
                         (setf *t* (+ *t* (cl-mpm::sim-dt *sim*))))
@@ -839,7 +843,8 @@
                       *data-load*)
 
                     (when (= rank 0)
-                      (let ((mesh-size (cl-mpm/mesh::mesh-resolution (cl-mpm:sim-mesh *sim*))))
+                      (let* ((mesh-size (cl-mpm/mesh::mesh-resolution (cl-mpm:sim-mesh *sim*)))
+                             (mesh-size 1d0))
                         (with-open-file (stream (merge-pathnames output-folder "disp.csv") :direction :output :if-exists :append)
                           (format stream "~f,~f,~f~%"
                                   average-disp
@@ -854,10 +859,11 @@
                               average-disp
                               )
                       ))
-                     ;(multiple-value-bind (dt-e substeps-e) (cl-mpm:calculate-adaptive-time *sim* target-time :dt-scale dt-scale)
-                     ;  ;; (format t "CFL dt estimate: ~f~%" dt-e)
-                     ;  ;; (format t "CFL step count estimate: ~D~%" substeps-e)
-                     ;  (setf substeps substeps-e))
+                     (multiple-value-bind (dt-e substeps-e) (cl-mpm:calculate-adaptive-time *sim* target-time :dt-scale dt-scale)
+                       (when (= rank 0)
+                         (format t "CFL dt estimate: ~f~%" dt-e)
+                         (format t "CFL step count estimate: ~D~%" substeps-e))
+                      (setf substeps substeps-e))
                      (incf *sim-step*)
                      (swank.live:update-swank)
                      ))))
