@@ -193,7 +193,9 @@
                (/ 1d0 e-scale)
                (mapcar (lambda (x) (* x e-scale)) size)
                ;; :sim-type 'cl-mpm/mpi::mpm-sim-usl-mpi-nodes-damage
-               :sim-type 'cl-mpm/mpi::mpm-sim-mpi-nodes-damage))
+               :sim-type 'cl-mpm/damage::mpm-sim-damage
+               ;:sim-type 'cl-mpm/mpi::mpm-sim-mpi-nodes-damage
+               ))
          (h (cl-mpm/mesh:mesh-resolution (cl-mpm:sim-mesh sim)))
          (h-x (/ h 1d0))
          (h-y (/ h 1d0))
@@ -666,51 +668,17 @@
       (format t "Mesh size:~F~%" (cl-mpm/mesh::mesh-resolution (cl-mpm:sim-mesh *sim*)))
       (format t "Terminus mps:~F~%" (length *terminus-mps*))
 
-      ;(let ((dsize (floor (sqrt (floor (cl-mpi:mpi-comm-size))))))
-      ;  (setf (cl-mpm/mpi::mpm-sim-mpi-domain-count *sim*) (list dsize dsize 1)))
-      (let ((dsize (floor (cl-mpi:mpi-comm-size))))
-       (setf (cl-mpm/mpi::mpm-sim-mpi-domain-count *sim*) (list dsize 1 1)))
-
-      ;; (let ((dsize (floor (sqrt (cl-mpi:mpi-comm-size)))))
-      ;;   (setf (cl-mpm/mpi::mpm-sim-mpi-domain-count *sim*) (list dsize dsize 1)))
-
-      (let ((dhalo-size (* 1 (cl-mpm/particle::mp-local-length (aref (cl-mpm:sim-mps *sim*) 0)))))
-	      (setf (cl-mpm/mpi::mpm-sim-mpi-halo-damage-size *sim*) dhalo-size))
-      (when (= rank 0)
-        (format t "Damage halo size: ~f~%" (cl-mpm/mpi::mpm-sim-mpi-halo-damage-size *sim*))
-        (format t "Sim MPs: ~a~%" (length (cl-mpm:sim-mps *sim*)))
-        (format t "Decompose~%"))
-      (cl-mpm/mpi::domain-decompose *sim*)
-; 	  (cl-mpm/mpi::domain-decompose
-; 	    *sim*
-; 	    :domain-scaler
-; 	    (lambda (domain)
-; 	  	(destructuring-bind (x y z) domain
-; 	  	  (let ((dnew (list (mapcar (lambda (p)
-;                                      (if (and 
-;                                            (> p 0d0)
-;                                            (< p 1d0))
-;                                          (* (+ p (/ 0.1 0.7)) 
-;                                             )
-;                                         p
-;                                         ))
-;                                       x)
-; 	  						 y z)))
-; 	  		(format t "Domain ~A ~A~%" (list x y z) dnew)
-; 	  		dnew))))
+      ;(let ((dsize (floor (cl-mpi:mpi-comm-size))))
+      ; (setf (cl-mpm/mpi::mpm-sim-mpi-domain-count *sim*) (list dsize 1 1)))
+      ;(let ((dhalo-size (* 1 (cl-mpm/particle::mp-local-length (aref (cl-mpm:sim-mps *sim*) 0)))))
+	  ;    (setf (cl-mpm/mpi::mpm-sim-mpi-halo-damage-size *sim*) dhalo-size))
+      ;(when (= rank 0)
+      ;  (format t "Damage halo size: ~f~%" (cl-mpm/mpi::mpm-sim-mpi-halo-damage-size *sim*))
+      ;  (format t "Sim MPs: ~a~%" (length (cl-mpm:sim-mps *sim*)))
+      ;  (format t "Decompose~%"))
+      ;(cl-mpm/mpi::domain-decompose *sim*)
 
       (format t "Rank: ~D - Sim MPs: ~a~%" rank (length (cl-mpm:sim-mps *sim*)))
- 
-	  ;(cl-mpm/mpi::domain-decompose *sim* :domain-scaler (lambda (domain)
-	  ;													 (format t "~A~%" domain)
-	  ;													 ;domain
-	  ;													 (destructuring-bind (x y z) domain
-	  ;													   (list
-	  ;														 (mapcar
-	  ;															  (lambda (p)
-	  ;																(expt p 1.3)
-	  ;																) x)
-	  ;															 y z))))
       (when (= rank 0)
         (format t "Sim MPs: ~a~%" (length (cl-mpm:sim-mps *sim*))))
       (when (= rank 0)
@@ -775,14 +743,6 @@
             0.5d0
             (sqrt mass-scale)
             (cl-mpm/setup::estimate-critical-damping *sim*))))
-  ;(loop for mp across (cl-mpm:sim-mps *sim*)
-  ;      do (change-class mp 'cl-mpm/particle::particle-limestone))
-
-
-
-
-  ;; (setf (cl-mpm/damage::sim-damage-delocal-counter-max *sim*) 40)
-
 
   (let* ((target-time 0.05d0)
          (dt (cl-mpm:sim-dt *sim*))
