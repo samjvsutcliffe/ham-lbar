@@ -35,6 +35,7 @@ for i in folders:
     mpm = pd.read_csv("./{}/disp.csv".format(i))
     print("GF mpm:",calculate_gf(1e3*mpm["disp"],100e-3*mpm["load"]))
     plt.plot(1e3*mpm["disp"],100e-3*mpm["load"],label=i,marker=".")
+    #plt.plot(1e3*mpm["disp"],6000*1e5*mpm["energy"],label=i,marker="+")
     plt.xlabel("Displacement (mm)")
     plt.ylabel("Load (N)")
     plt.legend()

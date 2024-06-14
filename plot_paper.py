@@ -36,7 +36,8 @@ print("GF experimental:",calculate_gf(1e0*data["disp"],100e-3*data["load"]))
 regex = re.compile(r'output-.*')
 folders = list(filter(regex.search,os.listdir("./")))
 
-plt.figure()
+#plt.figure()
+plt.figure(figsize=(width,height))
 plt.plot(data["disp"],data["load"],label="FEM")
 lower = pd.read_csv("lower.csv")
 upper = pd.read_csv("upper.csv")
@@ -50,8 +51,8 @@ upper_y = np.interp(x_samples,upper["x"],1e3*upper["y"])
 plt.fill_between(x_samples,lower_y,upper_y, facecolor='grey', alpha=0.5,label="Experimental")
 
 folders = ["./output-0.5-0.0-1.0/",
-           "./output-2.0-0.0-1.0/",
-           "./output-4.0-0.0-1.0/"]
+           "./output-1.0-0.0-1.0/",
+           "./output-2.0-0.0-1.0/"]
 
 names = ["Coarse","Medium","Fine"]
 for i,name in zip(folders,names):

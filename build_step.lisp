@@ -5,6 +5,7 @@
 (restrict-compiler-policy 'debug 0 0)
 (restrict-compiler-policy 'safety 0 0)
 (setf *block-compile-default* t)
+
 (declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
 (pushnew :cl-mpm-pic *features*)
 (ql:quickload :cl-mpm-worker)
