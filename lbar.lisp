@@ -52,8 +52,8 @@
     (cl-mpm::iterate-over-nodes
      mesh
      (lambda (node)
-       ;(cl-mpm::calculate-forces node damping dt mass-scale)
-       (cl-mpm::calculate-forces-cundall-conservative node damping dt mass-scale)
+       (cl-mpm::calculate-forces node damping dt mass-scale)
+       ;(cl-mpm::calculate-forces-cundall-conservative node damping dt mass-scale)
        ))))
 
 (defmacro rank-0-time (rank &rest body)
@@ -192,8 +192,8 @@
   (let* ((sim (cl-mpm/setup::make-block
                (/ 1d0 e-scale)
                (mapcar (lambda (x) (* x e-scale)) size)
-               ;; :sim-type 'cl-mpm/mpi::mpm-sim-usl-mpi-nodes-damage
-               :sim-type 'cl-mpm/damage::mpm-sim-damage
+               :sim-type 'cl-mpm/mpi::mpm-sim-usl-mpi-nodes-damage
+               ;:sim-type 'cl-mpm/damage::mpm-sim-usl-damage
                ;:sim-type 'cl-mpm/mpi::mpm-sim-mpi-nodes-damage
                ))
          (h (cl-mpm/mesh:mesh-resolution (cl-mpm:sim-mesh sim)))
@@ -310,7 +310,7 @@
            cut-size
            ))))
 
-      (let* ((crack-width (/ 0.05d0 8))
+      (let* ((crack-width (/ 0.05d0 4))
              (crack-pos ;; Max x pos
                (loop for mp across (cl-mpm:sim-mps sim)
                      when
@@ -403,9 +403,7 @@
                         normal
                         datum
                         (* 25.85d9 
-                           1d2
-                           ;(/ 1d2 (/ h 0.05))
-                           )
+                           1d2)
                         0d0)))))))))
       sim)))
 (defparameter *sim* nil)
@@ -417,7 +415,7 @@
                 (lc-scale 1d0)
                 (refine 1d0))
   (let* ((mesh-size (/ 0.025 refine))
-         (mps-per-cell 2);; (floor (* 2 kappa-scale)) 
+         (mps-per-cell 6);; (floor (* 2 kappa-scale)) 
          (shelf-height 0.500d0)
          (shelf-length 0.500d0)
          (domain-length (+ shelf-length 0.25d0))
@@ -668,15 +666,15 @@
       (format t "Mesh size:~F~%" (cl-mpm/mesh::mesh-resolution (cl-mpm:sim-mesh *sim*)))
       (format t "Terminus mps:~F~%" (length *terminus-mps*))
 
-      ;(let ((dsize (floor (cl-mpi:mpi-comm-size))))
-      ; (setf (cl-mpm/mpi::mpm-sim-mpi-domain-count *sim*) (list dsize 1 1)))
-      ;(let ((dhalo-size (* 1 (cl-mpm/particle::mp-local-length (aref (cl-mpm:sim-mps *sim*) 0)))))
-	  ;    (setf (cl-mpm/mpi::mpm-sim-mpi-halo-damage-size *sim*) dhalo-size))
-      ;(when (= rank 0)
-      ;  (format t "Damage halo size: ~f~%" (cl-mpm/mpi::mpm-sim-mpi-halo-damage-size *sim*))
-      ;  (format t "Sim MPs: ~a~%" (length (cl-mpm:sim-mps *sim*)))
-      ;  (format t "Decompose~%"))
-      ;(cl-mpm/mpi::domain-decompose *sim*)
+      (let ((dsize (floor (cl-mpi:mpi-comm-size))))
+       (setf (cl-mpm/mpi::mpm-sim-mpi-domain-count *sim*) (list dsize 1 1)))
+      (let ((dhalo-size (* 1 (cl-mpm/particle::mp-local-length (aref (cl-mpm:sim-mps *sim*) 0)))))
+	      (setf (cl-mpm/mpi::mpm-sim-mpi-halo-damage-size *sim*) dhalo-size))
+      (when (= rank 0)
+        (format t "Damage halo size: ~f~%" (cl-mpm/mpi::mpm-sim-mpi-halo-damage-size *sim*))
+        (format t "Sim MPs: ~a~%" (length (cl-mpm:sim-mps *sim*)))
+        (format t "Decompose~%"))
+      (cl-mpm/mpi::domain-decompose *sim*)
 
       (format t "Rank: ~D - Sim MPs: ~a~%" rank (length (cl-mpm:sim-mps *sim*)))
       (when (= rank 0)
@@ -744,7 +742,7 @@
             (sqrt mass-scale)
             (cl-mpm/setup::estimate-critical-damping *sim*))))
 
-  (let* ((target-time 0.05d0)
+  (let* ((target-time 0.5d0)
          (dt (cl-mpm:sim-dt *sim*))
          (dt-scale 0.50d0)
          (substeps (floor target-time dt))
@@ -789,7 +787,8 @@
                 (progn
                   (when (= rank 0)
                     (format t "Step ~d ~%" steps))
-                  (cl-mpm/output:save-vtk (merge-pathnames output-folder (format nil "sim_~2,'0d_~5,'0d.vtk" rank *sim-step*)) *sim*)
+                  (cl-mpm/output:save-vtk (merge-pathnames output-folder (format nil "sim_~2,'0d_~5,'0d.vtk" rank 0)) *sim*)
+                  ;(cl-mpm/output:save-vtk (merge-pathnames output-folder (format nil "sim_~2,'0d_~5,'0d.vtk" rank *sim-step*)) *sim*)
                   ;; (cl-mpm/output::save-vtk-nodes (merge-pathnames output-folder (format nil "sim_nodes_~2,'0d_~5,'0d.vtk" rank *sim-step*)) *sim*)
                   (let ((average-force 0d0)
                         (average-disp 0d0)
@@ -987,8 +986,8 @@
   (let* ((target-time 0.2d0)
          (dt (cl-mpm:sim-dt *sim*))
          (substeps (floor target-time dt))
-         (dt-scale 0.5d0)
-         (load-steps 100)
+         (dt-scale 0.25d0)
+         (load-steps 200)
          (disp-step (/ 0.8d-3 load-steps))
          (rank (cl-mpi:mpi-comm-rank)))
 
@@ -997,7 +996,12 @@
       (with-open-file (stream (merge-pathnames output-folder "disp.csv") :direction :output :if-exists :supersede)
         (format stream "disp,load,nload,energy,oobf~%")
         (format stream "~f,~f,~f,~f,~f~%" 0d0 0d0 0d0 0d0 0d0)))
-    (setf (cl-mpm:sim-damping-factor *sim*) 0.20d0)
+
+    ;(setf (cl-mpm:sim-damping-factor *sim*) 0.20d0)
+
+	(setf (cl-mpm:sim-damping-factor *sim*)
+		  (* 1.0d0
+			 (cl-mpm/setup::estimate-critical-damping *sim*)))
 
     (setf (cl-mpm:sim-dt *sim*) (cl-mpm/setup::estimate-elastic-dt *sim* :dt-scale dt-scale))
 
@@ -1014,13 +1018,15 @@
                 (progn
                   (when (= rank 0)
                     (format t "Step ~d ~%" steps))
-                  (cl-mpm/output:save-vtk (merge-pathnames output-folder (format nil "sim_~2,'0d_~5,'0d.vtk" rank *sim-step*)) *sim*)
-                  (cl-mpm/output::save-vtk-nodes (merge-pathnames output-folder (format nil "sim_nodes_~2,'0d_~5,'0d.vtk" rank *sim-step*)) *sim*)
+                  ;(cl-mpm/output:save-vtk (merge-pathnames output-folder (format nil "sim_~2,'0d_~5,'0d.vtk" rank *sim-step*)) *sim*)
+                  ;(cl-mpm/output::save-vtk-nodes (merge-pathnames output-folder (format nil "sim_nodes_~2,'0d_~5,'0d.vtk" rank *sim-step*)) *sim*)
+                  (cl-mpm/output:save-vtk (merge-pathnames output-folder (format nil "sim_~2,'0d_~5,'0d.vtk" rank 0)) *sim*)
+                  (cl-mpm/output::save-vtk-nodes (merge-pathnames output-folder (format nil "sim_nodes_~2,'0d_~5,'0d.vtk" rank 0)) *sim*)
                   ;(cl-mpm/output:save-vtk (merge-pathnames output-folder (format nil "sim_final_~2,'0d.vtk" rank)) *sim*) 
                   (let ((average-force 0d0)
                         (average-disp 0d0)
                         (average-reaction 0d0)
-                        (conv-steps (floor (* 800 *refine*)))
+                        (conv-steps (floor (* 200 *refine*)))
                         (energy 0d0)
                         (oobf 0d0))
                     (incf *target-displacement* disp-step)
@@ -1041,8 +1047,8 @@
                                           )))
                          (cl-mpm/dynamic-relaxation::converge-quasi-static
                            *sim*
-                           :energy-crit 1d-1
-                           :oobf-crit 1d-1
+                           :energy-crit 1d-3
+                           :oobf-crit 1d-3
                            :dt-scale dt-scale
                            :substeps 50
                            :conv-steps conv-steps
